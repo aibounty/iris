@@ -7,6 +7,7 @@ import {
   updateTags,
   resumeSession,
 } from "../lib/api";
+import { navigate } from "../lib/router";
 import { SessionDetail } from "../components/SessionDetail";
 import { useToast } from "../components/Toast";
 
@@ -133,6 +134,7 @@ export function SessionDetailPage({ sessionId }: SessionDetailPageProps) {
           </p>
           <a
             href="/"
+            onClick={(e) => { e.preventDefault(); navigate("/"); }}
             className="text-sm text-zinc-400 hover:text-zinc-200 underline transition-colors"
           >
             Back to Dashboard
@@ -149,6 +151,7 @@ export function SessionDetailPage({ sessionId }: SessionDetailPageProps) {
       <div className="mb-4">
         <a
           href="/"
+          onClick={(e) => { e.preventDefault(); navigate("/"); }}
           className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
         >
           <svg

@@ -1,5 +1,6 @@
 import type { Session } from "../lib/types";
 import { toRelativeTime, getTitle, truncate } from "../lib/utils";
+import { navigate } from "../lib/router";
 
 interface SessionTableProps {
   sessions: Session[];
@@ -38,6 +39,10 @@ export function SessionTable({ sessions, onResume }: SessionTableProps) {
               <td className="py-3 pr-4">
                 <a
                   href={`/sessions/${session.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigate(`/sessions/${session.id}`);
+                  }}
                   className="text-zinc-100 hover:text-white hover:underline"
                 >
                   {truncate(getTitle(session), 80)}

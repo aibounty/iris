@@ -1,5 +1,6 @@
 import type { Session } from "../lib/types";
 import { toRelativeTime, getTitle, truncate } from "../lib/utils";
+import { navigate } from "../lib/router";
 
 interface SessionCardProps {
   session: Session;
@@ -12,6 +13,10 @@ export function SessionCard({ session, onResume }: SessionCardProps) {
       <div className="flex items-start justify-between gap-2 mb-2">
         <a
           href={`/sessions/${session.id}`}
+          onClick={(e) => {
+            e.preventDefault();
+            navigate(`/sessions/${session.id}`);
+          }}
           className="text-sm font-medium text-zinc-100 hover:text-white hover:underline leading-snug"
         >
           {truncate(getTitle(session), 60)}
