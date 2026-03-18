@@ -10,6 +10,9 @@ import { registerNoteCommand } from "./commands/note.js";
 import { registerTagCommand } from "./commands/tag.js";
 import { registerPinCommand } from "./commands/pin.js";
 import { registerArchiveCommand } from "./commands/archive.js";
+import { registerOpenCommand } from "./commands/open.js";
+import { registerResumeCommand } from "./commands/resume.js";
+import { registerLastCommand } from "./commands/last.js";
 
 export function createProgram(
   contextFactory?: () => CliContext,
@@ -31,6 +34,9 @@ export function createProgram(
   registerTagCommand(program, getCtx);
   registerPinCommand(program, getCtx);
   registerArchiveCommand(program, getCtx);
+  registerOpenCommand(program, getCtx);
+  registerResumeCommand(program, getCtx);
+  registerLastCommand(program, getCtx);
 
   return program;
 }

@@ -27,3 +27,5 @@ export type {
 } from "./parser/index.js";
 export { Indexer } from "./indexer/index.js";
 export type { ScanResult, IndexerOptions } from "./indexer/index.js";
+export { TerminalManager, ShellAdapter } from "./terminal/index.js";
+export type { TerminalAdapter, TerminalPreference } from "./terminal/index.js";
