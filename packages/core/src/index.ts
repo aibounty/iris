@@ -14,3 +14,14 @@ export type {
   SessionUpsert,
   PaginatedResult,
 } from "./repo/index.js";
+export {
+  parseSessionIndexFile,
+  discoverProjectDirs,
+  parseAllSessions,
+  toSessionUpsert,
+} from "./parser/index.js";
+export type {
+  ParserLogger,
+  SessionIndexEntry,
+  SessionIndexFile,
+} from "./parser/index.js";
