@@ -6,6 +6,10 @@ import { registerListCommand } from "./commands/list.js";
 import { registerShowCommand } from "./commands/show.js";
 import { registerSearchCommand } from "./commands/search.js";
 import { registerScanCommand } from "./commands/scan.js";
+import { registerNoteCommand } from "./commands/note.js";
+import { registerTagCommand } from "./commands/tag.js";
+import { registerPinCommand } from "./commands/pin.js";
+import { registerArchiveCommand } from "./commands/archive.js";
 
 export function createProgram(
   contextFactory?: () => CliContext,
@@ -23,6 +27,10 @@ export function createProgram(
   registerShowCommand(program, getCtx);
   registerSearchCommand(program, getCtx);
   registerScanCommand(program, getCtx);
+  registerNoteCommand(program, getCtx);
+  registerTagCommand(program, getCtx);
+  registerPinCommand(program, getCtx);
+  registerArchiveCommand(program, getCtx);
 
   return program;
 }
