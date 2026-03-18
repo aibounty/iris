@@ -1,2 +1,1 @@
-// @iris/core — shared database, models, indexer logic
-export {};
+export { getDb, closeDb, createDb, runMigrations } from "./db/index.js";
