@@ -5,6 +5,8 @@ import type { Session, SessionFilter } from "./lib/types";
 import { Layout } from "./components/Layout";
 import { SessionTable } from "./components/SessionTable";
 import { SessionCard } from "./components/SessionCard";
+import { ToastProvider } from "./components/Toast";
+import { SessionDetailPage } from "./pages/SessionDetailPage";
 
 function useDebounce<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -20,7 +22,16 @@ function useDebounce<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
-export function App() {
+function parseRoute(): { page: "dashboard" } | { page: "session"; id: number } {
+  const path = window.location.pathname;
+  const match = path.match(/^\/sessions\/(\d+)$/);
+  if (match) {
+    return { page: "session", id: parseInt(match[1], 10) };
+  }
+  return { page: "dashboard" };
+}
+
+function Dashboard() {
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
 
@@ -105,5 +116,46 @@ export function App() {
         </>
       )}
     </Layout>
+  );
+}
+
+function SessionDetailPageWrapper({ sessionId }: { sessionId: number }) {
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+  });
+
+  const projects = projectsQuery.data ?? [];
+
+  return (
+    <Layout
+      projects={projects}
+      searchQuery=""
+      onSearchChange={() => {}}
+    >
+      <SessionDetailPage sessionId={sessionId} />
+    </Layout>
+  );
+}
+
+export function App() {
+  const [route, setRoute] = useState(parseRoute);
+
+  useEffect(() => {
+    function handlePopState() {
+      setRoute(parseRoute());
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  return (
+    <ToastProvider>
+      {route.page === "session" ? (
+        <SessionDetailPageWrapper sessionId={route.id} />
+      ) : (
+        <Dashboard />
+      )}
+    </ToastProvider>
   );
 }

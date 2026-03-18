@@ -49,3 +49,71 @@ export async function fetchTags(): Promise<Tag[]> {
 export async function fetchHealth(): Promise<{ status: string; version: string }> {
   return request<{ status: string; version: string }>("/api/health");
 }
+
+// --- Auth helpers ---
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem("iris-auth-token");
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem("iris-auth-token", token);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// --- Mutation helpers ---
+
+export async function updateNote(id: number, note: string): Promise<Session> {
+  const data = await request<{ session: Session }>(`/api/sessions/${id}/note`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ note }),
+  });
+  return data.session;
+}
+
+export async function updatePin(id: number, pinned: boolean): Promise<Session> {
+  const data = await request<{ session: Session }>(`/api/sessions/${id}/pin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ pinned }),
+  });
+  return data.session;
+}
+
+export async function updateArchive(id: number, archived: boolean): Promise<Session> {
+  const data = await request<{ session: Session }>(`/api/sessions/${id}/archive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ archived }),
+  });
+  return data.session;
+}
+
+export async function updateTags(
+  id: number,
+  add?: string[],
+  remove?: string[],
+): Promise<Session> {
+  const data = await request<{ session: Session }>(`/api/sessions/${id}/tags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ add, remove }),
+  });
+  return data.session;
+}
+
+export async function resumeSession(
+  id: number,
+  terminal?: string,
+): Promise<{ ok: boolean; terminal: string }> {
+  return request<{ ok: boolean; terminal: string }>(`/api/sessions/${id}/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ terminal }),
+  });
+}
