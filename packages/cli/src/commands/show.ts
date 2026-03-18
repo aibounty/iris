@@ -2,11 +2,17 @@ import type { Command } from "commander";
 import type { CliContext } from "../context.js";
 import { formatSessionDetail } from "../formatters.js";
 import type { SessionWithTags } from "@iris/core";
+import { resolveCurrentSession } from "../current-session.js";
 
 export function resolveSession(
   ctx: CliContext,
   idOrUuid: string,
 ): SessionWithTags {
+  // Handle "current" keyword
+  if (idOrUuid === "current") {
+    return resolveCurrentSession(ctx.sessionRepo);
+  }
+
   // Try as numeric ID
   const numId = parseInt(idOrUuid, 10);
   if (!isNaN(numId) && String(numId) === idOrUuid) {

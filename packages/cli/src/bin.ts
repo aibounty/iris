@@ -13,6 +13,7 @@ import { registerArchiveCommand } from "./commands/archive.js";
 import { registerOpenCommand } from "./commands/open.js";
 import { registerResumeCommand } from "./commands/resume.js";
 import { registerLastCommand } from "./commands/last.js";
+import { registerPickCommand } from "./commands/pick.js";
 
 export function createProgram(
   contextFactory?: () => CliContext,
@@ -37,6 +38,7 @@ export function createProgram(
   registerOpenCommand(program, getCtx);
   registerResumeCommand(program, getCtx);
   registerLastCommand(program, getCtx);
+  registerPickCommand(program, getCtx);
 
   return program;
 }
