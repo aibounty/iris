@@ -25,3 +25,5 @@ export type {
   SessionIndexEntry,
   SessionIndexFile,
 } from "./parser/index.js";
+export { Indexer } from "./indexer/index.js";
+export type { ScanResult, IndexerOptions } from "./indexer/index.js";
