@@ -1,2 +1,2 @@
-// @iris/server — Fastify HTTP API server
-export {};
+export { createApp } from "./app.js";
+export type { AppOptions } from "./app.js";
