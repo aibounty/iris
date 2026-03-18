@@ -1,17 +1,23 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { App } from "./App";
 import "./index.css";
 
-function App() {
-  return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center">
-      <h1 className="text-2xl font-bold">Iris</h1>
-    </div>
-  );
-}
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </React.StrictMode>,
 );
