@@ -1,0 +1,32 @@
+{
+  "name": "iris",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Terminal-first session manager for Claude Code",
+  "workspaces": [
+    "packages/core",
+    "packages/cli",
+    "packages/server",
+    "packages/web"
+  ],
+  "scripts": {
+    "build": "npm run build:core && npm run build:cli && npm run build:server && npm run build:web",
+    "build:core": "npm run build -w @iris/core",
+    "build:cli": "npm run build -w @iris/cli",
+    "build:server": "npm run build -w @iris/server",
+    "build:web": "npm run build -w @iris/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:web": "npm run dev -w @iris/web",
+    "dev:server": "npm run dev -w @iris/server",
+    "start": "node packages/cli/dist/bin.js serve"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

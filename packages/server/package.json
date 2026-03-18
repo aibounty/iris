@@ -1,0 +1,28 @@
+{
+  "name": "@iris/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@iris/core": "*",
+    "fastify": "^5.0.0",
+    "@fastify/cors": "^11.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}

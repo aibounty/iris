@@ -1,0 +1,25 @@
+{
+  "name": "@iris/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/bin.js",
+  "bin": {
+    "iris": "dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/bin.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@iris/core": "*",
+    "chalk": "^5.4.0",
+    "cli-table3": "^0.6.0",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0"
+  }
+}
