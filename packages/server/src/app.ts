@@ -7,6 +7,7 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { registerTagRoutes } from "./routes/tags.js";
+import { registerSessionMutationRoutes } from "./routes/session-mutations.js";
 
 export interface AppOptions {
   db: Database.Database;
@@ -50,6 +51,7 @@ export async function createApp(
   await app.register(registerSessionRoutes, { prefix: "/api" });
   await app.register(registerProjectRoutes, { prefix: "/api" });
   await app.register(registerTagRoutes, { prefix: "/api" });
+  await app.register(registerSessionMutationRoutes, { prefix: "/api" });
 
   return app;
 }
