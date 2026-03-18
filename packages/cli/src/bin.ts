@@ -17,6 +17,14 @@ import { registerPickCommand } from "./commands/pick.js";
 import { registerServeCommand } from "./commands/serve.js";
 import { registerConfigCommand } from "./commands/config.js";
 
+// Handle EPIPE gracefully (piping to head/grep)
+process.stdout.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE") process.exit(0);
+});
+process.stderr.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EPIPE") process.exit(0);
+});
+
 export function createProgram(
   contextFactory?: () => CliContext,
 ): Command {

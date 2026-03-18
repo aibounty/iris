@@ -13,7 +13,7 @@ export const SessionIndexEntrySchema = z
     gitBranch: z.string().default(""),
     projectPath: z.string().default(""),
     isSidechain: z.boolean().default(false),
-    customTitle: z.string().optional().default(""),
+    customTitle: z.string().nullable().optional().default(""),
   })
   .passthrough(); // Allow unknown fields for forward-compatibility
 

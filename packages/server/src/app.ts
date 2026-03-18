@@ -53,5 +53,17 @@ export async function createApp(
   await app.register(registerTagRoutes, { prefix: "/api" });
   await app.register(registerSessionMutationRoutes, { prefix: "/api" });
 
+  // Global error handler
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      request.log.error(error);
+    }
+    return reply.code(statusCode).send({
+      error: error.message || "Internal Server Error",
+      code: statusCode,
+    });
+  });
+
   return app;
 }

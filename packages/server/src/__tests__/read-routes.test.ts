@@ -174,8 +174,8 @@ describe("Read routes", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.claude_session_id).toBe("detail-session");
-      expect(body.tags).toContain("backend");
+      expect(body.session.claude_session_id).toBe("detail-session");
+      expect(body.session.tags).toContain("backend");
     });
 
     it("returns 404 for non-existent session", async () => {

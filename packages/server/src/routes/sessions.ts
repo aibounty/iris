@@ -58,6 +58,6 @@ export async function registerSessionRoutes(
       return reply.code(404).send({ error: "Session not found" });
     }
 
-    return session;
+    return { session };
   });
 }
