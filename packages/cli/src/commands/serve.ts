@@ -66,7 +66,7 @@ export function registerServeCommand(program: Command): void {
       // Serve static web UI files
       // Resolve the web dist directory relative to this package
       const thisDir = dirname(fileURLToPath(import.meta.url));
-      const webDistPath = resolve(thisDir, "../../web/dist");
+      const webDistPath = resolve(thisDir, "../../../web/dist");
       await registerStaticRoutes(app, { distPath: webDistPath });
 
       // Set up indexer
