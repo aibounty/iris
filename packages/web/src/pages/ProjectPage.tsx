@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useSessionsQuery } from "../hooks/useSessionsQuery";
+import { resumeSession } from "../lib/api";
 import { SessionTable } from "../components/SessionTable";
 import type { Session } from "../lib/types";
 
@@ -32,10 +33,15 @@ export function ProjectPage({ repoName }: ProjectPageProps) {
     });
   }, [sessions]);
 
-  const handleResume = useCallback((session: Session) => {
-    const cmd = `claude --resume "${session.claude_session_id}"`;
-    navigator.clipboard.writeText(cmd).catch(() => {});
-    alert(`Copied resume command to clipboard:\n\n${cmd}`);
+  const handleResume = useCallback(async (session: Session) => {
+    try {
+      const result = await resumeSession(session.id);
+      console.log(`Session resumed in ${result.terminal}`);
+    } catch {
+      const cmd = `claude --resume "${session.claude_session_id}"`;
+      navigator.clipboard.writeText(cmd).catch(() => {});
+      alert(`Copied resume command to clipboard:\n\n${cmd}`);
+    }
   }, []);
 
   if (sessionsQuery.isLoading) {

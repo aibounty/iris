@@ -46,8 +46,23 @@ export async function fetchTags(): Promise<Tag[]> {
   return data.tags;
 }
 
-export async function fetchHealth(): Promise<{ status: string; version: string }> {
-  return request<{ status: string; version: string }>("/api/health");
+export async function fetchHealth(): Promise<{ status: string; version: string; auth_token?: string | null }> {
+  return request<{ status: string; version: string; auth_token?: string | null }>("/api/health");
+}
+
+/**
+ * Fetch the auth token from the server and store it in localStorage.
+ * Called once on app startup.
+ */
+export async function initAuth(): Promise<void> {
+  try {
+    const health = await fetchHealth();
+    if (health.auth_token) {
+      setAuthToken(health.auth_token);
+    }
+  } catch {
+    // Server not available yet — auth will fail but that's expected
+  }
 }
 
 // --- Auth helpers ---

@@ -9,6 +9,7 @@ export async function registerHealthRoutes(
       status: "ok",
       version: "0.1.0",
       sessions_count: count,
+      auth_token: app.appOptions.authToken ?? null,
     };
   });
 }

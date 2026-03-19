@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchSessions } from "./lib/api";
+import { resumeSession } from "./lib/api";
 import { parseQueryParams, navigate } from "./lib/router";
 import { useSessionsQuery } from "./hooks/useSessionsQuery";
 import { useProjectsQuery } from "./hooks/useProjectsQuery";
@@ -97,10 +97,17 @@ function Dashboard() {
   const sessions = sessionsQuery.data?.sessions ?? [];
   const pinnedSessions = pinnedQuery.data?.sessions ?? [];
 
-  const handleResume = useCallback((session: Session) => {
-    const cmd = `claude --resume "${session.claude_session_id}"`;
-    navigator.clipboard.writeText(cmd).catch(() => {});
-    alert(`Copied resume command to clipboard:\n\n${cmd}`);
+  const handleResume = useCallback(async (session: Session) => {
+    try {
+      const result = await resumeSession(session.id);
+      // Session opened in terminal successfully
+      console.log(`Session resumed in ${result.terminal}`);
+    } catch {
+      // Fallback: copy command to clipboard
+      const cmd = `claude --resume "${session.claude_session_id}"`;
+      navigator.clipboard.writeText(cmd).catch(() => {});
+      alert(`Copied resume command to clipboard:\n\n${cmd}`);
+    }
   }, []);
 
   function handleSearchChange(value: string) {
