@@ -77,7 +77,7 @@ export function registerServeCommand(program: Command): void {
       const scanResult = indexer.scan();
       logger.info(
         { scanResult },
-        `Initial scan: ${scanResult.total} sessions (${scanResult.new} new)`,
+        `Initial scan: ${scanResult.total} sessions (${scanResult.newSessions} new)`,
       );
 
       // Start polling

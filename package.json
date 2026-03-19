@@ -10,7 +10,7 @@
     "packages/web"
   ],
   "scripts": {
-    "build": "npm run build:core && npm run build:cli && npm run build:server && npm run build:web",
+    "build": "npm run build:core && npm run build:server && npm run build:cli && npm run build:web",
     "build:core": "npm run build -w @iris/core",
     "build:cli": "npm run build -w @iris/cli",
     "build:server": "npm run build -w @iris/server",

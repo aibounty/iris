@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyError } from "fastify";
 import type Database from "better-sqlite3";
 import { SessionRepo, ProjectRepo, TagRepo } from "@iris/core";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -54,7 +54,7 @@ export async function createApp(
   await app.register(registerSessionMutationRoutes, { prefix: "/api" });
 
   // Global error handler
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     const statusCode = error.statusCode ?? 500;
     if (statusCode >= 500) {
       request.log.error(error);
