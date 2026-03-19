@@ -21,10 +21,42 @@ export class ShellAdapter implements TerminalAdapter {
     projectPath?: string,
   ): Promise<void> {
     const args = ["--resume", claudeSessionId];
-    await execa("claude", args, {
-      cwd: projectPath || undefined,
-      stdio: "inherit",
-    });
+
+    if (process.platform === "darwin") {
+      // On macOS, open a new Terminal.app window rather than hijacking current shell
+      const cdCmd = projectPath
+        ? `cd ${escapeShell(projectPath)} && `
+        : "";
+      const fullCmd = `${cdCmd}claude --resume ${escapeShell(claudeSessionId)}`;
+      const script = `
+        tell application "Terminal"
+          activate
+          do script "${escapeAppleScript(fullCmd)}"
+        end tell
+      `;
+      await execa("osascript", ["-e", script]);
+    } else if (process.platform === "linux") {
+      // Try common Linux terminal emulators
+      try {
+        await execa("x-terminal-emulator", ["-e", "claude", ...args], {
+          cwd: projectPath || undefined,
+          detached: true,
+          stdio: "ignore",
+        });
+      } catch {
+        // Last resort: run in current shell
+        await execa("claude", args, {
+          cwd: projectPath || undefined,
+          stdio: "inherit",
+        });
+      }
+    } else {
+      // Windows or other: run in current shell
+      await execa("claude", args, {
+        cwd: projectPath || undefined,
+        stdio: "inherit",
+      });
+    }
   }
 }
 
@@ -33,10 +65,11 @@ export class ItermAdapter implements TerminalAdapter {
 
   async isAvailable(): Promise<boolean> {
     try {
+      // Check if iTerm exists on the system, not just if it's running
       const { stdout } = await execaCommand(
-        `osascript -e 'application "iTerm" is running'`,
+        `osascript -e 'id of application "iTerm2"'`,
       );
-      return stdout.trim() === "true";
+      return stdout.trim().length > 0;
     } catch {
       return false;
     }
@@ -69,14 +102,9 @@ export class TerminalAppAdapter implements TerminalAdapter {
   name = "terminal_app";
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const { stdout } = await execaCommand(
-        `osascript -e 'application "Terminal" is running'`,
-      );
-      return stdout.trim() === "true";
-    } catch {
-      return false;
-    }
+    if (process.platform !== "darwin") return false;
+    // Terminal.app is always installed on macOS
+    return true;
   }
 
   async openSession(
