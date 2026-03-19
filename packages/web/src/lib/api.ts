@@ -18,6 +18,7 @@ export async function fetchSessions(
 
   if (params.q !== undefined) searchParams.set("q", params.q);
   if (params.repo !== undefined) searchParams.set("repo", params.repo);
+  if (params.project_path !== undefined) searchParams.set("project_path", params.project_path);
   if (params.branch !== undefined) searchParams.set("branch", params.branch);
   if (params.tag !== undefined) searchParams.set("tag", params.tag);
   if (params.pinned !== undefined) searchParams.set("pinned", params.pinned ? "1" : "0");
@@ -39,6 +40,11 @@ export async function fetchSession(id: number): Promise<Session> {
 export async function fetchProjects(): Promise<Project[]> {
   const data = await request<{ projects: Project[] }>("/api/projects");
   return data.projects;
+}
+
+export async function fetchProject(id: number): Promise<Project> {
+  const data = await request<{ project: Project }>(`/api/projects/${id}`);
+  return data.project;
 }
 
 export async function fetchTags(): Promise<Tag[]> {

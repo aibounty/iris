@@ -9,6 +9,7 @@ export async function registerSessionRoutes(
     Querystring: {
       q?: string;
       repo?: string;
+      project_path?: string;
       branch?: string;
       tag?: string;
       pinned?: string;
@@ -24,6 +25,7 @@ export async function registerSessionRoutes(
     const filter: SessionFilter = {
       q: query.q || undefined,
       repo: query.repo || undefined,
+      project_path: query.project_path || undefined,
       branch: query.branch || undefined,
       tag: query.tag || undefined,
       pinned: query.pinned === "true" ? true : undefined,

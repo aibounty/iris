@@ -4,14 +4,37 @@ import { navigate } from "../lib/router";
 
 interface SidebarProps {
   projects: Project[];
-  activeRepo?: string;
+  activeProjectId?: number;
 }
 
-export function Sidebar({ projects, activeRepo }: SidebarProps) {
+/** For projects with duplicate repo_name, show parent dir as disambiguation. */
+function buildDisplayNames(projects: Project[]): Map<number, string> {
+  const nameCounts = new Map<string, number>();
+  for (const p of projects) {
+    nameCounts.set(p.repo_name, (nameCounts.get(p.repo_name) ?? 0) + 1);
+  }
+
+  const result = new Map<number, string>();
+  for (const p of projects) {
+    if ((nameCounts.get(p.repo_name) ?? 0) > 1) {
+      // Show parent directory for disambiguation
+      const parts = p.project_path.split("/");
+      const parent = parts.length >= 2 ? parts[parts.length - 2] : "";
+      result.set(p.id, parent ? `${p.repo_name} (${parent})` : p.repo_name);
+    } else {
+      result.set(p.id, p.repo_name);
+    }
+  }
+  return result;
+}
+
+export function Sidebar({ projects, activeProjectId }: SidebarProps) {
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => b.last_seen_at.localeCompare(a.last_seen_at)),
     [projects],
   );
+
+  const displayNames = useMemo(() => buildDisplayNames(projects), [projects]);
 
   const currentPath = window.location.pathname;
   const isDashboard = currentPath === "/" || currentPath === "";
@@ -41,7 +64,7 @@ export function Sidebar({ projects, activeRepo }: SidebarProps) {
               navigate("/");
             }}
             className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${
-              isDashboard && !activeRepo
+              isDashboard && activeProjectId == null
                 ? "text-zinc-100 bg-zinc-800"
                 : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
             }`}
@@ -71,16 +94,14 @@ export function Sidebar({ projects, activeRepo }: SidebarProps) {
           ) : (
             <ul className="space-y-0.5">
               {sortedProjects.map((project) => {
-                const isActive = activeRepo === project.repo_name;
+                const isActive = activeProjectId === project.id;
                 return (
                   <li key={project.id}>
                     <a
-                      href={`/projects/${encodeURIComponent(project.repo_name)}`}
+                      href={`/projects/${project.id}`}
                       onClick={(e) => {
                         e.preventDefault();
-                        navigate(
-                          `/projects/${encodeURIComponent(project.repo_name)}`,
-                        );
+                        navigate(`/projects/${project.id}`);
                       }}
                       className={`flex items-center justify-between px-3 py-1.5 text-sm rounded-md transition-colors ${
                         isActive
@@ -88,7 +109,7 @@ export function Sidebar({ projects, activeRepo }: SidebarProps) {
                           : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
                       }`}
                     >
-                      <span className="truncate">{project.repo_name}</span>
+                      <span className="truncate">{displayNames.get(project.id) ?? project.repo_name}</span>
                       <span className="text-xs text-zinc-600 tabular-nums ml-2">
                         {project.session_count}
                       </span>

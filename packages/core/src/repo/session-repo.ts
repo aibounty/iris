@@ -93,7 +93,10 @@ export class SessionRepo {
       conditions.push("s.is_sidechain = 0");
     }
 
-    if (filter.repo) {
+    if (filter.project_path) {
+      conditions.push("s.project_path = @project_path");
+      params["project_path"] = filter.project_path;
+    } else if (filter.repo) {
       conditions.push("s.repo_name = @repo");
       params["repo"] = filter.repo;
     }

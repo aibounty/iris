@@ -1,19 +1,27 @@
 import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSessionsQuery } from "../hooks/useSessionsQuery";
-import { resumeSession } from "../lib/api";
+import { fetchProject, resumeSession } from "../lib/api";
 import { SessionTable } from "../components/SessionTable";
 import type { Session } from "../lib/types";
 
 interface ProjectPageProps {
-  repoName: string;
+  projectId: number;
 }
 
-export function ProjectPage({ repoName }: ProjectPageProps) {
-  const sessionsQuery = useSessionsQuery({
-    repo: repoName,
-    limit: 200,
-    sort: "last_seen_at",
+export function ProjectPage({ projectId }: ProjectPageProps) {
+  const projectQuery = useQuery({
+    queryKey: ["project", projectId],
+    queryFn: () => fetchProject(projectId),
   });
+
+  const project = projectQuery.data;
+
+  const sessionsQuery = useSessionsQuery(
+    project
+      ? { project_path: project.project_path, limit: 200, sort: "last_seen_at" }
+      : { limit: 0 },
+  );
 
   const sessions = sessionsQuery.data?.sessions ?? [];
 
@@ -44,10 +52,18 @@ export function ProjectPage({ repoName }: ProjectPageProps) {
     }
   }, []);
 
-  if (sessionsQuery.isLoading) {
+  if (projectQuery.isLoading || sessionsQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="text-zinc-500 text-sm">Loading sessions...</div>
+      </div>
+    );
+  }
+
+  if (projectQuery.isError) {
+    return (
+      <div className="p-4 bg-red-950/50 border border-red-900 rounded-lg text-sm text-red-300">
+        Failed to load project.
       </div>
     );
   }
@@ -63,7 +79,8 @@ export function ProjectPage({ repoName }: ProjectPageProps) {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-zinc-100">{repoName}</h1>
+        <h1 className="text-xl font-semibold text-zinc-100">{project?.repo_name}</h1>
+        <p className="text-xs text-zinc-600 font-mono mt-0.5">{project?.project_path}</p>
         <p className="text-sm text-zinc-500 mt-1">
           {sessions.length} session{sessions.length !== 1 ? "s" : ""} across{" "}
           {branchGroups.length} branch{branchGroups.length !== 1 ? "es" : ""}

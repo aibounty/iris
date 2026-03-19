@@ -16,7 +16,7 @@ import { ProjectPage } from "./pages/ProjectPage";
 type Route =
   | { page: "dashboard" }
   | { page: "session"; id: number }
-  | { page: "project"; repoName: string };
+  | { page: "project"; projectId: number };
 
 function parseRoute(): Route {
   const path = window.location.pathname;
@@ -26,9 +26,9 @@ function parseRoute(): Route {
     return { page: "session", id: parseInt(sessionMatch[1], 10) };
   }
 
-  const projectMatch = path.match(/^\/projects\/(.+)$/);
+  const projectMatch = path.match(/^\/projects\/(\d+)$/);
   if (projectMatch) {
-    return { page: "project", repoName: decodeURIComponent(projectMatch[1]) };
+    return { page: "project", projectId: parseInt(projectMatch[1], 10) };
   }
 
   return { page: "dashboard" };
@@ -215,7 +215,7 @@ function AppContent() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  const activeRepo = route.page === "project" ? route.repoName : undefined;
+  const activeProjectId = route.page === "project" ? route.projectId : undefined;
 
   return (
     <Layout
@@ -227,12 +227,12 @@ function AppContent() {
           navigate(`/?q=${encodeURIComponent(val)}`);
         }
       }}
-      activeRepo={activeRepo}
+      activeProjectId={activeProjectId}
     >
       {route.page === "session" ? (
         <SessionDetailPage sessionId={route.id} />
       ) : route.page === "project" ? (
-        <ProjectPage repoName={route.repoName} />
+        <ProjectPage projectId={route.projectId} />
       ) : (
         <Dashboard />
       )}

@@ -8,7 +8,7 @@ interface LayoutProps {
   projects: Project[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  activeRepo?: string;
+  activeProjectId?: number;
 }
 
 export function Layout({
@@ -16,11 +16,11 @@ export function Layout({
   projects,
   searchQuery,
   onSearchChange,
-  activeRepo,
+  activeProjectId,
 }: LayoutProps) {
   return (
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
-      <Sidebar projects={projects} activeRepo={activeRepo} />
+      <Sidebar projects={projects} activeProjectId={activeProjectId} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-zinc-800 px-6 py-4">

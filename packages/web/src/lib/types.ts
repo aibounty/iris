@@ -39,6 +39,7 @@ export interface Tag {
 export interface SessionFilter {
   q?: string;
   repo?: string;
+  project_path?: string;
   branch?: string;
   tag?: string;
   pinned?: boolean;
