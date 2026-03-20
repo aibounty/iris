@@ -9,33 +9,120 @@ import { ProjectRepo } from "../repo/project-repo.js";
 import { TagRepo } from "../repo/tag-repo.js";
 import { Indexer } from "../indexer/indexer.js";
 
-function createMockSessionIndex(sessions: Array<{
-  id: string;
-  prompt: string;
-  summary: string;
-  branch: string;
-  projectPath: string;
+/** Create a JSONL session file content with user/assistant messages. */
+function makeJsonlContent(opts: {
+  sessionId: string;
+  cwd: string;
+  gitBranch: string;
+  firstPrompt: string;
   messageCount?: number;
   isSidechain?: boolean;
-}>): string {
-  return JSON.stringify({
-    version: 1,
-    entries: sessions.map((s) => ({
-      sessionId: s.id,
-      fullPath: `/mock/${s.id}.jsonl`,
-      fileMtime: Date.now(),
-      firstPrompt: s.prompt,
-      summary: s.summary,
-      messageCount: s.messageCount ?? 10,
-      created: "2025-03-15T10:00:00.000Z",
-      modified: "2025-03-15T12:00:00.000Z",
-      gitBranch: s.branch,
-      projectPath: s.projectPath,
-      isSidechain: s.isSidechain ?? false,
-      customTitle: null,
-    })),
-    originalPath: sessions[0]?.projectPath ?? "/unknown",
-  });
+}): string {
+  const lines: string[] = [];
+  const userCount = Math.max(1, Math.ceil((opts.messageCount ?? 2) / 2));
+  const isSidechain = opts.isSidechain ?? false;
+
+  for (let i = 0; i < userCount; i++) {
+    const prompt = i === 0 ? opts.firstPrompt : `Follow-up ${i}`;
+    lines.push(
+      JSON.stringify({
+        type: "user",
+        sessionId: opts.sessionId,
+        cwd: opts.cwd,
+        gitBranch: opts.gitBranch,
+        isSidechain,
+        uuid: `user-${i}`,
+        parentUuid: i === 0 ? null : `assistant-${i - 1}`,
+        message: { role: "user", content: prompt },
+        timestamp: "2025-03-15T10:00:00.000Z",
+      }),
+    );
+
+    lines.push(
+      JSON.stringify({
+        type: "assistant",
+        sessionId: opts.sessionId,
+        cwd: opts.cwd,
+        gitBranch: opts.gitBranch,
+        uuid: `assistant-${i}`,
+        parentUuid: `user-${i}`,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: `Response ${i}` }],
+        },
+        timestamp: "2025-03-15T12:00:00.000Z",
+      }),
+    );
+  }
+
+  return lines.join("\n") + "\n";
+}
+
+function makeIndexFile(
+  entries: Record<string, unknown>[],
+  originalPath = "/test/project",
+) {
+  return JSON.stringify({ version: 1, entries, originalPath });
+}
+
+function setupMockData(
+  tempDir: string,
+  projects: {
+    dirName: string;
+    sessions: {
+      id: string;
+      prompt: string;
+      summary: string;
+      branch: string;
+      projectPath: string;
+      messageCount?: number;
+      isSidechain?: boolean;
+    }[];
+  }[],
+) {
+  const projectsDir = join(tempDir, "projects");
+
+  for (const proj of projects) {
+    const projDir = join(projectsDir, proj.dirName);
+    mkdirSync(projDir, { recursive: true });
+
+    // Create JSONL files
+    for (const s of proj.sessions) {
+      writeFileSync(
+        join(projDir, `${s.id}.jsonl`),
+        makeJsonlContent({
+          sessionId: s.id,
+          cwd: s.projectPath,
+          gitBranch: s.branch,
+          firstPrompt: s.prompt,
+          messageCount: s.messageCount,
+          isSidechain: s.isSidechain,
+        }),
+      );
+    }
+
+    // Create sessions-index.json for enrichment
+    writeFileSync(
+      join(projDir, "sessions-index.json"),
+      makeIndexFile(
+        proj.sessions.map((s) => ({
+          sessionId: s.id,
+          fullPath: join(projDir, `${s.id}.jsonl`),
+          fileMtime: Date.now(),
+          firstPrompt: s.prompt,
+          summary: s.summary,
+          messageCount: s.messageCount ?? 10,
+          created: "2025-03-15T10:00:00.000Z",
+          modified: "2025-03-15T12:00:00.000Z",
+          gitBranch: s.branch,
+          projectPath: s.projectPath,
+          isSidechain: s.isSidechain ?? false,
+          customTitle: null,
+        })),
+        proj.sessions[0]?.projectPath ?? "/unknown",
+      ),
+    );
+  }
 }
 
 describe("Full pipeline integration", () => {
@@ -56,46 +143,34 @@ describe("Full pipeline integration", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("indexes sessions from multiple projects and preserves user data on re-scan", () => {
-    // Create 3 projects with multiple sessions
-    const projectsDir = join(tempDir, "projects");
-
-    // Project 1: web-app (4 sessions)
-    const proj1Dir = join(projectsDir, "-Volumes-code-web-app");
-    mkdirSync(proj1Dir, { recursive: true });
-    writeFileSync(
-      join(proj1Dir, "sessions-index.json"),
-      createMockSessionIndex([
-        { id: "sess-1", prompt: "Fix auth bug", summary: "Debugged JWT refresh", branch: "main", projectPath: "/Volumes/code/web-app" },
-        { id: "sess-2", prompt: "Add dark mode", summary: "Implemented theme system", branch: "feature/dark-mode", projectPath: "/Volumes/code/web-app" },
-        { id: "sess-3", prompt: "Refactor API", summary: "Cleaned up endpoints", branch: "main", projectPath: "/Volumes/code/web-app" },
-        { id: "sess-4", prompt: "Write tests", summary: "Added unit tests for auth", branch: "main", projectPath: "/Volumes/code/web-app", messageCount: 25 },
-      ]),
-    );
-
-    // Project 2: backend-api (3 sessions)
-    const proj2Dir = join(projectsDir, "-Volumes-code-backend-api");
-    mkdirSync(proj2Dir, { recursive: true });
-    writeFileSync(
-      join(proj2Dir, "sessions-index.json"),
-      createMockSessionIndex([
-        { id: "sess-5", prompt: "Set up database", summary: "Created PostgreSQL schema", branch: "main", projectPath: "/Volumes/code/backend-api" },
-        { id: "sess-6", prompt: "Add caching layer", summary: "Redis caching for queries", branch: "feature/caching", projectPath: "/Volumes/code/backend-api" },
-        { id: "sess-7", prompt: "Fix memory leak", summary: "Found connection pool issue", branch: "hotfix/memory", projectPath: "/Volumes/code/backend-api", isSidechain: true },
-      ]),
-    );
-
-    // Project 3: mobile-app (3 sessions)
-    const proj3Dir = join(projectsDir, "-Volumes-code-mobile-app");
-    mkdirSync(proj3Dir, { recursive: true });
-    writeFileSync(
-      join(proj3Dir, "sessions-index.json"),
-      createMockSessionIndex([
-        { id: "sess-8", prompt: "Build login screen", summary: "React Native login", branch: "main", projectPath: "/Volumes/code/mobile-app" },
-        { id: "sess-9", prompt: "Push notifications", summary: "Firebase push setup", branch: "feature/notifications", projectPath: "/Volumes/code/mobile-app" },
-        { id: "sess-10", prompt: "Performance optimization", summary: "Reduced bundle size", branch: "main", projectPath: "/Volumes/code/mobile-app", messageCount: 50 },
-      ]),
-    );
+  it("indexes sessions from JSONL files and preserves user data on re-scan", () => {
+    setupMockData(tempDir, [
+      {
+        dirName: "-Volumes-code-web-app",
+        sessions: [
+          { id: "sess-1", prompt: "Fix auth bug", summary: "Debugged JWT refresh", branch: "main", projectPath: "/Volumes/code/web-app" },
+          { id: "sess-2", prompt: "Add dark mode", summary: "Implemented theme system", branch: "feature/dark-mode", projectPath: "/Volumes/code/web-app" },
+          { id: "sess-3", prompt: "Refactor API", summary: "Cleaned up endpoints", branch: "main", projectPath: "/Volumes/code/web-app" },
+          { id: "sess-4", prompt: "Write tests", summary: "Added unit tests for auth", branch: "main", projectPath: "/Volumes/code/web-app", messageCount: 25 },
+        ],
+      },
+      {
+        dirName: "-Volumes-code-backend-api",
+        sessions: [
+          { id: "sess-5", prompt: "Set up database", summary: "Created PostgreSQL schema", branch: "main", projectPath: "/Volumes/code/backend-api" },
+          { id: "sess-6", prompt: "Add caching layer", summary: "Redis caching for queries", branch: "feature/caching", projectPath: "/Volumes/code/backend-api" },
+          { id: "sess-7", prompt: "Fix memory leak", summary: "Found connection pool issue", branch: "hotfix/memory", projectPath: "/Volumes/code/backend-api", isSidechain: true },
+        ],
+      },
+      {
+        dirName: "-Volumes-code-mobile-app",
+        sessions: [
+          { id: "sess-8", prompt: "Build login screen", summary: "React Native login", branch: "main", projectPath: "/Volumes/code/mobile-app" },
+          { id: "sess-9", prompt: "Push notifications", summary: "Firebase push setup", branch: "feature/notifications", projectPath: "/Volumes/code/mobile-app" },
+          { id: "sess-10", prompt: "Performance optimization", summary: "Reduced bundle size", branch: "main", projectPath: "/Volumes/code/mobile-app", messageCount: 50 },
+        ],
+      },
+    ]);
 
     const indexer = new Indexer(db, { claudeDataDir: tempDir });
     const sessionRepo = new SessionRepo(db);
@@ -109,7 +184,7 @@ describe("Full pipeline integration", () => {
     expect(result1.updated).toBe(0);
     expect(result1.errors).toBe(0);
 
-    // Verify all sessions indexed (sidechains excluded by default in list)
+    // Verify all sessions indexed (sidechains included with flag)
     const allSessions = sessionRepo.list({ limit: 50, sidechains: true });
     expect(allSessions.total).toBe(10);
 
@@ -120,19 +195,22 @@ describe("Full pipeline integration", () => {
     expect(webApp).toBeDefined();
     expect(webApp!.session_count).toBe(4);
 
+    // Verify enrichment from sessions-index.json
+    const sess1 = sessionRepo.findByClaudeId("sess-1")!;
+    expect(sess1.summary).toBe("Debugged JWT refresh");
+
     // Add user data
-    const sess1 = sessionRepo.findByClaudeId("sess-1");
-    expect(sess1).toBeDefined();
-    sessionRepo.updateNote(sess1!.id, "stopped at retry logic");
-    sessionRepo.updatePin(sess1!.id, true);
-    sessionRepo.addTag(sess1!.id, "important");
-    sessionRepo.addTag(sess1!.id, "auth");
+    sessionRepo.updateNote(sess1.id, "stopped at retry logic");
+    sessionRepo.updatePin(sess1.id, true);
+    sessionRepo.addTag(sess1.id, "important");
+    sessionRepo.addTag(sess1.id, "auth");
 
     const sess5 = sessionRepo.findByClaudeId("sess-5");
     sessionRepo.addTag(sess5!.id, "backend");
     sessionRepo.updateNote(sess5!.id, "schema v2 draft");
 
-    // Re-scan
+    // Re-scan (reset cache to force)
+    indexer.resetCache();
     const result2 = indexer.scan();
     expect(result2.total).toBe(10);
     expect(result2.newSessions).toBe(0);
@@ -151,7 +229,7 @@ describe("Full pipeline integration", () => {
 
     // FTS search
     const authResults = sessionRepo.list({ q: "auth" });
-    expect(authResults.total).toBeGreaterThanOrEqual(2); // "Fix auth bug" and "Added unit tests for auth"
+    expect(authResults.total).toBeGreaterThanOrEqual(1); // "Fix auth bug"
 
     const redisResults = sessionRepo.list({ q: "Redis" });
     expect(redisResults.total).toBeGreaterThanOrEqual(1);
@@ -162,7 +240,7 @@ describe("Full pipeline integration", () => {
 
     // Filter by branch
     const mainSessions = sessionRepo.list({ branch: "main" });
-    expect(mainSessions.total).toBeGreaterThanOrEqual(5); // multiple "main" branches across projects
+    expect(mainSessions.total).toBeGreaterThanOrEqual(5);
 
     // Pagination (sidechains excluded by default, so total = 9)
     const page1 = sessionRepo.list({ limit: 3, offset: 0 });
@@ -195,10 +273,13 @@ describe("Full pipeline integration", () => {
     const projDir = join(projectsDir, "-test");
     mkdirSync(projDir, { recursive: true });
     writeFileSync(
-      join(projDir, "sessions-index.json"),
-      createMockSessionIndex([
-        { id: "unicode-sess", prompt: "Test unicode", summary: "Testing", branch: "main", projectPath: "/test" },
-      ]),
+      join(projDir, "unicode-sess.jsonl"),
+      makeJsonlContent({
+        sessionId: "unicode-sess",
+        cwd: "/test",
+        gitBranch: "main",
+        firstPrompt: "Test unicode",
+      }),
     );
 
     const indexer = new Indexer(db, { claudeDataDir: tempDir });

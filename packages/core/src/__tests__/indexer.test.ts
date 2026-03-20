@@ -7,7 +7,13 @@ import {
   vi,
 } from "vitest";
 import Database from "better-sqlite3";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  utimesSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runMigrations } from "../db/migrate.js";
@@ -21,22 +27,60 @@ function createTestDb(): Database.Database {
   return db;
 }
 
-function makeEntry(overrides: Record<string, unknown> = {}) {
-  return {
-    sessionId: `sess-${Math.random().toString(36).slice(2)}`,
-    fullPath: "/path/to/session.jsonl",
-    fileMtime: 1700000000000,
-    firstPrompt: "Test prompt",
-    summary: "Test summary",
-    messageCount: 10,
-    created: "2025-03-15T10:00:00.000Z",
-    modified: "2025-03-15T12:00:00.000Z",
-    gitBranch: "main",
-    projectPath: "/home/user/myproject",
-    isSidechain: false,
-    customTitle: "",
-    ...overrides,
-  };
+/** Create a minimal JSONL session file. */
+function makeJsonlContent(opts: {
+  sessionId: string;
+  cwd?: string;
+  gitBranch?: string;
+  isSidechain?: boolean;
+  firstPrompt?: string;
+  userMessages?: number;
+  startTime?: string;
+  endTime?: string;
+}): string {
+  const lines: string[] = [];
+  const cwd = opts.cwd ?? "/home/user/myproject";
+  const branch = opts.gitBranch ?? "main";
+  const isSidechain = opts.isSidechain ?? false;
+  const start = opts.startTime ?? "2025-03-15T10:00:00.000Z";
+  const end = opts.endTime ?? "2025-03-15T12:00:00.000Z";
+  const userCount = opts.userMessages ?? 1;
+
+  for (let i = 0; i < userCount; i++) {
+    const prompt =
+      i === 0 ? opts.firstPrompt ?? "Test prompt" : `Follow-up ${i}`;
+    lines.push(
+      JSON.stringify({
+        type: "user",
+        sessionId: opts.sessionId,
+        cwd,
+        gitBranch: branch,
+        isSidechain,
+        uuid: `user-${i}`,
+        parentUuid: i === 0 ? null : `assistant-${i - 1}`,
+        message: { role: "user", content: prompt },
+        timestamp: i === 0 ? start : end,
+      }),
+    );
+
+    lines.push(
+      JSON.stringify({
+        type: "assistant",
+        sessionId: opts.sessionId,
+        cwd,
+        gitBranch: branch,
+        uuid: `assistant-${i}`,
+        parentUuid: `user-${i}`,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: `Response ${i}` }],
+        },
+        timestamp: end,
+      }),
+    );
+  }
+
+  return lines.join("\n") + "\n";
 }
 
 function makeIndexFile(
@@ -48,7 +92,19 @@ function makeIndexFile(
 
 function setupMockClaudeData(
   tmpDir: string,
-  projects: { name: string; entries: Record<string, unknown>[] }[],
+  projects: {
+    name: string;
+    sessions: {
+      sessionId: string;
+      cwd?: string;
+      gitBranch?: string;
+      isSidechain?: boolean;
+      firstPrompt?: string;
+      userMessages?: number;
+      summary?: string;
+      customTitle?: string;
+    }[];
+  }[],
 ) {
   const projectsDir = join(tmpDir, "projects");
   mkdirSync(projectsDir, { recursive: true });
@@ -56,10 +112,46 @@ function setupMockClaudeData(
   for (const proj of projects) {
     const projDir = join(projectsDir, proj.name);
     mkdirSync(projDir, { recursive: true });
-    writeFileSync(
-      join(projDir, "sessions-index.json"),
-      makeIndexFile(proj.entries),
-    );
+
+    // Create JSONL files for each session
+    for (const sess of proj.sessions) {
+      writeFileSync(
+        join(projDir, `${sess.sessionId}.jsonl`),
+        makeJsonlContent({
+          sessionId: sess.sessionId,
+          cwd: sess.cwd ?? "/home/user/myproject",
+          gitBranch: sess.gitBranch ?? "main",
+          isSidechain: sess.isSidechain,
+          firstPrompt: sess.firstPrompt ?? "Test prompt",
+          userMessages: sess.userMessages ?? 1,
+        }),
+      );
+    }
+
+    // Create sessions-index.json for enrichment (summary/customTitle)
+    const indexEntries = proj.sessions
+      .filter((s) => s.summary || s.customTitle)
+      .map((s) => ({
+        sessionId: s.sessionId,
+        fullPath: join(projDir, `${s.sessionId}.jsonl`),
+        fileMtime: Date.now(),
+        firstPrompt: s.firstPrompt ?? "Test prompt",
+        summary: s.summary ?? "",
+        messageCount: (s.userMessages ?? 1) * 2,
+        created: "2025-03-15T10:00:00.000Z",
+        modified: "2025-03-15T12:00:00.000Z",
+        gitBranch: s.gitBranch ?? "main",
+        projectPath: s.cwd ?? "/home/user/myproject",
+        isSidechain: s.isSidechain ?? false,
+        customTitle: s.customTitle ?? "",
+      }));
+
+    if (indexEntries.length > 0) {
+      writeFileSync(
+        join(projDir, "sessions-index.json"),
+        makeIndexFile(indexEntries),
+      );
+    }
   }
 }
 
@@ -77,13 +169,13 @@ describe("Indexer", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("indexes sessions from Claude Code data", () => {
+  it("indexes sessions from JSONL files", () => {
     setupMockClaudeData(tmpDir, [
       {
         name: "-proj-a",
-        entries: [
-          makeEntry({ sessionId: "s1", projectPath: "/proj/a" }),
-          makeEntry({ sessionId: "s2", projectPath: "/proj/a" }),
+        sessions: [
+          { sessionId: "s1", cwd: "/proj/a" },
+          { sessionId: "s2", cwd: "/proj/a" },
         ],
       },
     ]);
@@ -94,24 +186,96 @@ describe("Indexer", () => {
     expect(result.total).toBe(2);
     expect(result.newSessions).toBe(2);
     expect(result.updated).toBe(0);
+    expect(result.skipped).toBe(0);
     expect(result.errors).toBe(0);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("counts updates on re-scan", () => {
+  it("enriches sessions with summary from sessions-index.json", () => {
     setupMockClaudeData(tmpDir, [
       {
         name: "-proj-a",
-        entries: [makeEntry({ sessionId: "s1" })],
+        sessions: [
+          {
+            sessionId: "s1",
+            cwd: "/proj/a",
+            summary: "Debugged auth flow",
+            customTitle: "Auth Fix",
+          },
+        ],
       },
     ]);
 
     const indexer = new Indexer(db, { claudeDataDir: tmpDir });
     indexer.scan();
 
+    const repo = new SessionRepo(db);
+    const session = repo.findByClaudeId("s1");
+    expect(session).not.toBeNull();
+    expect(session!.summary).toBe("Debugged auth flow");
+    expect(session!.custom_title).toBe("Auth Fix");
+  });
+
+  it("counts updates on re-scan", () => {
+    setupMockClaudeData(tmpDir, [
+      {
+        name: "-proj-a",
+        sessions: [{ sessionId: "s1" }],
+      },
+    ]);
+
+    const indexer = new Indexer(db, { claudeDataDir: tmpDir });
+    indexer.scan();
+
+    // Force re-scan by resetting cache
+    indexer.resetCache();
     const result = indexer.scan();
     expect(result.total).toBe(1);
     expect(result.newSessions).toBe(0);
+    expect(result.updated).toBe(1);
+  });
+
+  it("skips unchanged files on incremental scan", () => {
+    setupMockClaudeData(tmpDir, [
+      {
+        name: "-proj-a",
+        sessions: [{ sessionId: "s1" }, { sessionId: "s2" }],
+      },
+    ]);
+
+    const indexer = new Indexer(db, { claudeDataDir: tmpDir });
+
+    // First scan indexes everything
+    const result1 = indexer.scan();
+    expect(result1.total).toBe(2);
+    expect(result1.skipped).toBe(0);
+
+    // Second scan skips unchanged files
+    const result2 = indexer.scan();
+    expect(result2.total).toBe(0);
+    expect(result2.skipped).toBe(2);
+    expect(result2.newSessions).toBe(0);
+  });
+
+  it("re-scans files whose mtime changed", () => {
+    setupMockClaudeData(tmpDir, [
+      {
+        name: "-proj-a",
+        sessions: [{ sessionId: "s1" }],
+      },
+    ]);
+
+    const indexer = new Indexer(db, { claudeDataDir: tmpDir });
+    indexer.scan();
+
+    // Touch the file to change mtime
+    const filePath = join(tmpDir, "projects", "-proj-a", "s1.jsonl");
+    const futureTime = new Date(Date.now() + 10000);
+    utimesSync(filePath, futureTime, futureTime);
+
+    const result = indexer.scan();
+    expect(result.total).toBe(1);
+    expect(result.skipped).toBe(0);
     expect(result.updated).toBe(1);
   });
 
@@ -122,27 +286,19 @@ describe("Indexer", () => {
     const projDir = join(projectsDir, "-proj-a");
     mkdirSync(projDir);
     writeFileSync(
-      join(projDir, "sessions-index.json"),
-      makeIndexFile([
-        makeEntry({ sessionId: "valid-1" }),
-        makeEntry({ sessionId: "valid-2" }),
-      ]),
+      join(projDir, "valid-session.jsonl"),
+      makeJsonlContent({ sessionId: "valid-1", cwd: "/proj/a" }),
     );
 
-    // Add another project with corrupt index
-    const projDir2 = join(projectsDir, "-proj-b");
-    mkdirSync(projDir2);
-    writeFileSync(
-      join(projDir2, "sessions-index.json"),
-      "not valid json",
-    );
+    // Create a corrupt JSONL file
+    writeFileSync(join(projDir, "corrupt.jsonl"), "not valid json at all\n");
 
     const indexer = new Indexer(db, { claudeDataDir: tmpDir });
     const result = indexer.scan();
 
-    // Only valid sessions from proj-a should be indexed
-    expect(result.total).toBe(2);
-    expect(result.newSessions).toBe(2);
+    // The valid session should be indexed; corrupt file parsed as null (skipped, no error)
+    expect(result.newSessions).toBe(1);
+    expect(result.errors).toBe(0);
   });
 
   it("polling starts and stops", () => {
@@ -151,7 +307,7 @@ describe("Indexer", () => {
     setupMockClaudeData(tmpDir, [
       {
         name: "-proj-a",
-        entries: [makeEntry({ sessionId: "s1" })],
+        sessions: [{ sessionId: "s1" }],
       },
     ]);
 
@@ -182,52 +338,52 @@ describe("Indexer integration", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("full pipeline: mock data → index → query → mutate → re-index → verify", () => {
+  it("full pipeline: JSONL files → index → query → mutate → re-index → verify", () => {
     // 1. Create mock Claude Code data with 2 projects, 5 sessions
     setupMockClaudeData(tmpDir, [
       {
         name: "-proj-alpha",
-        entries: [
-          makeEntry({
+        sessions: [
+          {
             sessionId: "a1",
-            projectPath: "/proj/alpha",
+            cwd: "/proj/alpha",
             firstPrompt: "Setup project alpha",
             summary: "Initial project setup",
             gitBranch: "main",
-          }),
-          makeEntry({
+          },
+          {
             sessionId: "a2",
-            projectPath: "/proj/alpha",
+            cwd: "/proj/alpha",
             firstPrompt: "Fix auth in alpha",
             summary: "Authentication debugging",
             gitBranch: "feature/auth",
-          }),
-          makeEntry({
+          },
+          {
             sessionId: "a3",
-            projectPath: "/proj/alpha",
+            cwd: "/proj/alpha",
             firstPrompt: "Add redis caching",
             summary: "Redis integration",
             gitBranch: "feature/redis",
-          }),
+          },
         ],
       },
       {
         name: "-proj-beta",
-        entries: [
-          makeEntry({
+        sessions: [
+          {
             sessionId: "b1",
-            projectPath: "/proj/beta",
+            cwd: "/proj/beta",
             firstPrompt: "CI setup for beta",
             summary: "CI/CD pipeline configuration",
             gitBranch: "main",
-          }),
-          makeEntry({
+          },
+          {
             sessionId: "b2",
-            projectPath: "/proj/beta",
+            cwd: "/proj/beta",
             firstPrompt: "Database migration",
             summary: "Migrate from MySQL to Postgres",
             gitBranch: "feature/postgres",
-          }),
+          },
         ],
       },
     ]);
@@ -250,7 +406,8 @@ describe("Indexer integration", () => {
     repo.updatePin(authSession.id, true);
     repo.addTag(authSession.id, "important");
 
-    // 5. Re-scan
+    // 5. Re-scan (reset cache to force full scan)
+    indexer.resetCache();
     const result2 = indexer.scan();
     expect(result2.total).toBe(5);
     expect(result2.newSessions).toBe(0);
